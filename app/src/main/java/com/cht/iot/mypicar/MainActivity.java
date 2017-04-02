@@ -25,10 +25,11 @@ public class MainActivity extends AppCompatActivity {
 
     HeartbeatReceiver heartbeatReceiver;
 
+    PiCameraClient cameraClient;
     int cameraClientPort = 20000;
     int cameraClientTimeout = 5000;
 
-    MyPiCarClient client;
+    MyPiCarClient carClient;
     int carClientPort = 10000;
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
@@ -99,30 +100,45 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 heartbeatReceiver.close();
 
-                if (client != null) {
-                    try {
-                        client.close();
-
-                    } catch (IOException e) {
-                        LOG.error(e.getMessage(), e);
-                    }
-                }
+                closeClients();
             }
         });
 
         super.onDestroy();
     }
 
+    void closeClients() {
+        if (carClient != null) {
+            try {
+                carClient.close();
+
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        }
+
+        if (cameraClient != null) {
+            try {
+                cameraClient.close();
+
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        }
+    }
+
     public void onVideoStreaming(View view) {
         scheduler.execute(new Runnable() {
             @Override
             public void run() {
+                closeClients();
+
                 try {
                     String host = hostTextView.getText().toString();
 
-                    client = new MyPiCarClient(host, carClientPort);
+                    carClient = new MyPiCarClient(host, carClientPort);
 
-                    PiCameraClient pcc = new PiCameraClient(host, cameraClientPort, cameraClientTimeout, new PiCameraClient.Listener() {
+                    cameraClient = new PiCameraClient(host, cameraClientPort, cameraClientTimeout, new PiCameraClient.Listener() {
                         @Override
                         public void onSnapshot(final byte[] snapshot) {
                             Bitmap b = BitmapFactory.decodeByteArray(snapshot, 0, snapshot.length);
@@ -150,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
     void control(final int west, final int east, final long duration) {
         LOG.info("Control - west: {}, east: {}", west, east);
 
-        if (client == null) {
+        if (carClient == null) {
             LOG.warn("MyPiCarClient is not initialized");
             return;
         }
@@ -159,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    client.control(west, east, duration);
+                    carClient.control(west, east, duration);
 
                 } catch (Exception e) {
                     LOG.error(e.getMessage(), e);
